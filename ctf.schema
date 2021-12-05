@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 11.13
+-- Dumped from database version 11.14
 -- Dumped by pg_dump version 14.1
 
 SET statement_timeout = 0;
@@ -15,6 +15,20 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
+
+--
+-- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
+
 
 --
 -- Name: check_submission(text); Type: FUNCTION; Schema: public; Owner: -
@@ -34,7 +48,7 @@ SELECT (CASE WHEN COUNT(*) > 0 THEN true ELSE false END) FROM flags f WHERE subm
 CREATE FUNCTION public.solved(team_name text) RETURNS TABLE(name text, flag text, solved_time text, points integer)
     LANGUAGE sql
     AS $$
-SELECT f.name, s.submission, COALESCE(to_char(s.timestamp, 'YYYY-MM-DD HH:MM:SS'), '- -'), f.points FROM v_solves vs LEFT JOIN teams t ON vs.team_id=t.id LEFT JOIN flags f ON vs.flag_id=f.id LEFT JOIN submissions s ON vs.submissions[1]=s.id WHERE t.name=team_name AND f.name IS NOT NULL $$;
+SELECT f.name, s.submission, COALESCE(to_char(s.timestamp, 'YYYY-MM-DD HH24:MI:SS'), '- -'), f.points FROM v_solves vs LEFT JOIN teams t ON vs.team_id=t.id LEFT JOIN flags f ON vs.flag_id=f.id LEFT JOIN submissions s ON vs.submissions[1]=s.id WHERE t.name=team_name AND f.name IS NOT NULL $$;
 
 
 --
@@ -69,7 +83,7 @@ CREATE TABLE public.flags (
     visible boolean DEFAULT true,
     enabled boolean DEFAULT true,
     name text,
-    description text,
+    description text DEFAULT ''::text,
     points integer,
     regexp text
 );
@@ -173,7 +187,7 @@ CREATE VIEW public.v_solves AS
 --
 
 CREATE VIEW public.v_scoreboard AS
- SELECT row_number() OVER () AS place,
+ SELECT row_number() OVER (ORDER BY (sum(f.points)) DESC) AS place,
     t.name,
     sum(f.points) AS score
    FROM ((public.v_solves vs
@@ -226,7 +240,7 @@ CREATE VIEW public.v_team_info AS
 --
 
 CREATE VIEW public.v_valid_submissions AS
- SELECT COALESCE(to_char(s."timestamp", 'YYYY-MM-DD HH:MM:SS'::text), '- -'::text) AS "time",
+ SELECT COALESCE(to_char(s."timestamp", 'YYYY-MM-DD HH24:MI:SS'::text), '- -'::text) AS "time",
     t.name AS team_name,
     f.name AS flag_name
    FROM (((public.submissions s
