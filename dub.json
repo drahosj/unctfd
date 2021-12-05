@@ -1,0 +1,12 @@
+{
+	"authors": [
+		"Jake Jake Drahos"
+	],
+	"copyright": "Copyright C 2021 Jake Drahos",
+	"dependencies": {
+		"dpq2": "~>1.0.23"
+	},
+	"description": "A minimal D application.",
+	"license": "BSD 2-Clause",
+	"name": "unctfd"
+}
