@@ -3,6 +3,8 @@ import std.getopt;
 import std.conv;
 import std.string;
 
+import core.stdc.stdio : setbuf, stdout;
+
 import dpq2;
 
 import menu;
@@ -18,6 +20,7 @@ int  main(string[] args)
     getopt(args, 
             "conn|c", &conn_string,
             "preauth|p", &preauthenticate_as);
+    setbuf(stdout, null);
 
     conn = new Connection(conn_string);
 

@@ -59,6 +59,10 @@ int get_selection()
     write("Select an option: ");
     string choice = readln().chomp();
 
+    if (choice.length == 0) {
+        return 0;
+    }
+
     if (choice[0] == 'q') {
         return -1;
     } else if (choice[0] == '?') {

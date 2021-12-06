@@ -1,6 +1,7 @@
 import std.stdio;
 import std.conv;
 import std.string;
+import core.exception;
 
 import dpq2;
 
@@ -55,9 +56,9 @@ private int submit()
 
 private int unsolved()
 {
-    string fmt = "|%-70s|%6s|";
+    string fmt = "|%-70s|%7s|";
     writefln(fmt, "Challenge Name", "Points");
-    writeln(hsep);
+    write(hsep);
 
     if (logged_in) {
         QueryParams p;
@@ -83,7 +84,7 @@ private int solved()
 {
     string fmt = "|%-40s|%-30s|%-6s|";
     writefln(fmt, "Challenge Name", "Solve timestamp", "Points");
-    writeln(hsep);
+    write(hsep);
 
     if (logged_in) {
         QueryParams p;
@@ -110,7 +111,7 @@ private int description()
 {
     string fmt = "|%-6s|%-60s|%-10s|";
     writefln(fmt, "", "Challenge Name", "Points");
-    writeln(hsep);
+    write(hsep);
 
     QueryParams p;
     p.sqlCommand = "SELECT name, points, description FROM FLAGS WHERE visible";
@@ -136,6 +137,8 @@ private int description()
         writeln(descriptions[flag - 1]);
         writeln();
     } catch (ConvException) {
+        writeln("Invalid choice.");
+    } catch (RangeError) {
         writeln("Invalid choice.");
     }
     return false;

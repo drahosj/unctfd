@@ -8,5 +8,11 @@
 	},
 	"description": "A minimal D application.",
 	"license": "BSD 2-Clause",
-	"name": "unctfd"
+	"name": "unctfd",
+    "configurations": [
+        {
+            "targetType": "executable",
+            "name": "static"
+        }
+    ]
 }
