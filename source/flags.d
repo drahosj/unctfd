@@ -27,7 +27,7 @@ static this()
     m_unsolved = Menu("Show unsolved flags", 
             [&m_description, &m_submenu, &m_root], &unsolved);
 
-    m_submenu = Menu("Flags ->", [
+    m_submenu = Menu("Flags " ~ T_GREEN ~ "->" ~ RESET, [
             &m_description, 
             &m_unsolved, 
             &m_solved,
@@ -39,15 +39,39 @@ static this()
     menus["flags"] = &m_submenu;
 }
 
+private long getScore()
+{
+    if (logged_in) {
+        QueryParams p;
+        p.sqlCommand = "SELECT * FROM v_scoreboard WHERE name=$1";
+        p.argsVariadic(team_name);
+        auto res = conn.execParams(p);
+        scope(exit) destroy(res);
+
+        return res[0]["score"].as!PGbigint;
+    } else {
+        return -1;
+    }
+}
+
 private int submit()
 {
     if (logged_in) {
+        writef("Enter Submission: %s", T_GREEN);
         string flag = readln().chomp();
+        writefln("%s", RESET);
         
+        long pre_score = getScore();
         QueryParams p;
         p.sqlCommand = "CALL SUBMIT($1, $2)";
         p.argsVariadic(team_name, flag);
         conn.execParams(p);
+
+        if (getScore() > pre_score) {
+            writefln("The submission was %sCORRECT%s!", T_GREEN, RESET);
+        } else {
+            writefln("The submission was %sINCORRECT%s!", T_RED, RESET);
+        }
     } else {
         writeln("Not logged in");
     }

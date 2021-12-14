@@ -3,6 +3,8 @@ import std.conv;
 import std.string;
 import std.functional;
 
+import art;
+
 Menu *[string] menus;
 
 struct Menu {
@@ -33,9 +35,9 @@ struct Menu {
     {
         writeln();
         foreach(i, option; options) {
-            writefln("%d) %s", i + 1, option.title);
+            writefln("%s%d%s) %s", T_GREEN, i + 1, RESET, option.title);
         }
-        writefln("q) Exit");
+        writefln("%sq%s) Exit", T_RED, RESET);
     }
 
     int enter() 

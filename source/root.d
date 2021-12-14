@@ -24,7 +24,8 @@ private int root_entry()
 {
     if (logged_in) {
         writeln();
-        writefln("You are currently logged in as %s", team_name);
+        writefln("You are currently logged in as %s%s%s", 
+                T_GREEN, team_name, RESET);
     }
     return true;
 }
