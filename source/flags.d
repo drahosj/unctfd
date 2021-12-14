@@ -48,7 +48,11 @@ private long getScore()
         auto res = conn.execParams(p);
         scope(exit) destroy(res);
 
-        return res[0]["score"].as!PGbigint;
+        if (res.length > 0) {
+            return res[0]["score"].as!PGbigint;
+        } else {
+            return 0;
+        }
     } else {
         return -1;
     }
