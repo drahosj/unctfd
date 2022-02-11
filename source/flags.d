@@ -142,12 +142,15 @@ private int description()
     write(hsep);
 
     QueryParams p;
-    p.sqlCommand = "SELECT name, points, description FROM FLAGS WHERE visible";
+    p.sqlCommand = q"END_SQL
+        SELECT name, points, description, id FROM FLAGS WHERE visible
+END_SQL";
 
     auto r = conn.execParams(p);
     scope(exit) destroy(r);
 
     string[] descriptions = [];
+    int[] ids = [];
     int i = 1;
     foreach(row; rangify(r)) {
         writefln(fmt, (i++).to!string,
@@ -155,6 +158,7 @@ private int description()
                 row["points"].as!PGinteger.to!string
                 );
         descriptions ~= [row["description"].as!PGtext.idup];
+        ids ~= row["id"].as!PGinteger;
     }
 
     write("Select flag: ");
@@ -164,6 +168,21 @@ private int description()
         writeln();
         writeln(descriptions[flag - 1]);
         writeln();
+
+        QueryParams p2;
+        p2.sqlCommand = q"END_SQL
+            SELECT attachments.name, uri FROM attachments 
+            LEFT JOIN flags ON flag_id = flags.id 
+            WHERE flags.id = $1
+END_SQL";
+        p2.argsVariadic(ids[flag - 1]);
+        auto r2 = conn.execParams(p2).rangify();
+        if (!r2.empty()) {
+            writeln("Attachments: ");
+            foreach(row; r2) {
+                writefln("%s: %s", row["name"].as!PGtext, row["uri"].as!PGtext);
+            }
+        }
     } catch (ConvException) {
         writeln("Invalid choice.");
     } catch (RangeError) {
