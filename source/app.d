@@ -17,10 +17,14 @@ int  main(string[] args)
     string conn_string = "dbname=ctf";
     string preauthenticate_as;
 
-    getopt(args, 
+    auto opt = getopt(args, 
             "conn|c", &conn_string,
-            "preauth|p", &preauthenticate_as);
+            "preauth|p", "Preauth as team (by team ID)", &preauthenticate_as);
     setbuf(stdout, null);
+    if (opt.helpWanted) {
+        defaultGetoptPrinter("unctfd: ", opt.options);
+        return -1;
+    }
 
     conn = new Connection(conn_string);
 
@@ -34,8 +38,8 @@ int  main(string[] args)
         ];
     } else {
         QueryParams p;
-        p.sqlCommand = "SELECT id FROM teams WHERE name=$1";
-        p.argsVariadic(preauthenticate_as);
+        p.sqlCommand = "SELECT name, id FROM teams WHERE id=$1";
+        p.argsVariadic(preauthenticate_as.to!int);
 
         auto results = conn.execParams(p);
         scope(exit) destroy(results);
@@ -44,14 +48,14 @@ int  main(string[] args)
             writeln("Invalid team specified for preauthentication");
             return -1;
         } else {
-            team_name = preauthenticate_as;
+            team_name = results[0]["name"].as!PGtext;
             team_id = results[0]["id"].as!PGinteger;
             logged_in = true;
 
             m["root"].options = [
                 m["scoreboard"],
                 m["submit"],
-                m["flags"]
+                m["flags"],
             ];
         }
 

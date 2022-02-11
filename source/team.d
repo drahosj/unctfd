@@ -1,5 +1,6 @@
 import std.stdio;
 import std.string;
+import std.regex;
 
 import dpq2;
 
@@ -21,6 +22,29 @@ static this()
 
     menus["register"] = &m_register;
     menus["login"] = &m_login;
+}
+
+private bool add_ssh_key()
+{
+    write("Paste key here: ");
+    string sshkey = readln().chomp();
+    auto m = sshkey.matchFirst(r"^ssh-rsa ([A-Za-z0-9+/]+).*$");
+    if (m.empty) {
+        writeln("Invalid SSH key.");
+        return false;
+    } else {
+        QueryParams p;
+        p.sqlCommand = q"END_SQL
+            INSERT INTO ssh_keys (team_id, key) 
+            VALUES ($1::int, $2::text)
+END_SQL";
+        p.argsVariadic(team_id, m[1]);
+        conn.execParams(p);
+        writeln("Key accepted!");
+        write("Keys are added in a batch process, so it");
+        writeln("may take up to one minute to take effect.");
+    }
+    return true;
 }
 
 private int do_register() 
@@ -48,6 +72,16 @@ private int do_register()
         } else {
             if (register(name, pass)) {
                 writeln("Registered!");
+                auto ssh = "";
+                do {
+                    do {
+                        write("Add SSH key? (y/n): ");
+                        ssh = readln().chomp().toLower();
+                    } while (ssh != "y" && ssh != "n");
+                    if (ssh == "y")  {
+                        add_ssh_key();
+                    }
+                } while (ssh != "n");
                 return false;
             }
         }
@@ -117,14 +151,17 @@ private int register(string name, string pass)
     INSERT INTO teams (name, hash) VALUES (
             $1::text,
             crypt($2::text, gen_salt('bf', 10))
-            )
+            ) RETURNING id
 END_SQL";
 
 
     p.argsVariadic(name, pass);
 
     auto r = conn.execParams(p);
+
     scope(exit) destroy(r);
+    team_id = r[0]["id"].as!PGinteger;
+    team_name = name;
     return true;
 }
 
