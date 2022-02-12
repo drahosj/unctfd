@@ -45,10 +45,10 @@ SELECT (CASE WHEN COUNT(*) > 0 THEN true ELSE false END) FROM flags f WHERE subm
 -- Name: solved(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.solved(team_name text) RETURNS TABLE(name text, flag text, solved_time text, points integer)
+CREATE FUNCTION public.solved(team_name text) RETURNS TABLE(name text, flag text, solved_time text, points integer, parent integer)
     LANGUAGE sql
     AS $$
-SELECT f.name, s.submission, COALESCE(to_char(s.timestamp, 'YYYY-MM-DD HH24:MI:SS'), '- -'), f.points FROM v_solves vs LEFT JOIN teams t ON vs.team_id=t.id LEFT JOIN flags f ON vs.flag_id=f.id LEFT JOIN submissions s ON vs.submissions[1]=s.id WHERE t.name=team_name AND f.name IS NOT NULL $$;
+SELECT f.name, s.submission, COALESCE(to_char(s.timestamp, 'YYYY-MM-DD HH24:MI:SS'), '- -'), f.points, f.parent FROM v_solves vs LEFT JOIN teams t ON vs.team_id=t.id LEFT JOIN flags f ON vs.flag_id=f.id LEFT JOIN submissions s ON vs.submissions[1]=s.id WHERE t.name=team_name AND f.name IS NOT NULL $$;
 
 
 --
@@ -69,10 +69,36 @@ $$;
 CREATE FUNCTION public.unsolved(team_name text) RETURNS TABLE(flag_name text, points integer)
     LANGUAGE sql
     AS $$
-SELECT f.name, f.points FROM flags f LEFT JOIN (SELECT team_id, flag_id FROM v_solves vs LEFT JOIN teams t ON vs.team_id=t.id WHERE t.name=team_name) AS ts ON ts.flag_id=f.id WHERE ts.flag_id IS NULL AND f.visible AND f.enabled$$;
+SELECT f.name, f.points FROM flags f LEFT JOIN (SELECT team_id, flag_id FROM v_solves vs LEFT JOIN teams t ON vs.team_id=t.id WHERE t.name=team_name) AS ts ON ts.flag_id=f.id WHERE ts.flag_id IS NULL AND f.visible AND f.enabled AND f.solvable UNION SELECT f.name, (f.points - cp)::int points FROM flags f LEFT JOIN (SELECT team_id, flag_id FROM v_solves vs LEFT JOIN teams t ON vs.team_id=t.id WHERE t.name=team_name) AS ts ON ts.flag_id=f.id LEFT JOIN (SELECT parent, SUM(points) cp from solved(team_name) GROUP BY parent) AS sc ON sc.parent=f.id WHERE ts.flag_id IS NULL AND f.visible AND f.enabled AND NOT f.solvable$$;
 
 
 SET default_tablespace = '';
+
+--
+-- Name: attachments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.attachments (
+    name text,
+    uri text,
+    flag_id integer,
+    id integer NOT NULL
+);
+
+
+--
+-- Name: attachments_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.attachments ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.attachments_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
 
 --
 -- Name: flags; Type: TABLE; Schema: public; Owner: -
@@ -85,7 +111,9 @@ CREATE TABLE public.flags (
     name text,
     description text DEFAULT ''::text,
     points integer,
-    regexp text
+    regexp text,
+    solvable boolean DEFAULT true,
+    parent integer
 );
 
 
@@ -95,6 +123,31 @@ CREATE TABLE public.flags (
 
 ALTER TABLE public.flags ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME public.flags_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: ssh_keys; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ssh_keys (
+    key text,
+    id integer NOT NULL,
+    team_id integer
+);
+
+
+--
+-- Name: ssh_keys_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.ssh_keys ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.ssh_keys_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -251,11 +304,27 @@ CREATE VIEW public.v_valid_submissions AS
 
 
 --
+-- Name: attachments attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attachments
+    ADD CONSTRAINT attachments_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: flags flags_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.flags
     ADD CONSTRAINT flags_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ssh_keys ssh_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ssh_keys
+    ADD CONSTRAINT ssh_keys_pkey PRIMARY KEY (id);
 
 
 --
@@ -295,6 +364,30 @@ CREATE OR REPLACE VIEW public.v_flag_info AS
      LEFT JOIN public.v_solves vs ON ((f.id = vs.flag_id)))
      LEFT JOIN public.teams t ON ((vs.team_id = t.id)))
   GROUP BY f.id;
+
+
+--
+-- Name: attachments attachments_flag_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attachments
+    ADD CONSTRAINT attachments_flag_id_fkey FOREIGN KEY (flag_id) REFERENCES public.flags(id);
+
+
+--
+-- Name: flags flag_parent_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flags
+    ADD CONSTRAINT flag_parent_fkey FOREIGN KEY (parent) REFERENCES public.flags(id);
+
+
+--
+-- Name: ssh_keys ssh_keys_team_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ssh_keys
+    ADD CONSTRAINT ssh_keys_team_id_fkey FOREIGN KEY (team_id) REFERENCES public.teams(id);
 
 
 --
