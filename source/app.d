@@ -56,6 +56,7 @@ int  main(string[] args)
                 m["scoreboard"],
                 m["submit"],
                 m["flags"],
+                m["ssh"],
             ];
         }
 

@@ -14,14 +14,17 @@ string team_name;
 
 private Menu m_register;
 private Menu m_login;
+private Menu m_ssh_key;
 
 static this()
 {
     m_register = Menu("Register new team", &do_register);
     m_login = Menu("Login existing team", &do_login);
+    m_ssh_key = Menu("Add SSH key", &do_ssh_key);
 
     menus["register"] = &m_register;
     menus["login"] = &m_login;
+    menus["ssh"] = &m_ssh_key;
 }
 
 private bool add_ssh_key()
@@ -45,6 +48,12 @@ END_SQL";
         writeln("may take up to one minute to take effect.");
     }
     return true;
+}
+
+private int do_ssh_key()
+{
+    add_ssh_key();
+    return false;
 }
 
 private int do_register() 
@@ -128,6 +137,7 @@ private int do_login()
 
         opt ~= [menus["submit"]];
         opt ~= [menus["flags"]];
+        opt ~= [menus["ssh"]];
 
         menus["root"].options = opt;
 
