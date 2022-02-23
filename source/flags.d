@@ -15,6 +15,7 @@ private Menu m_submit;
 private Menu m_unsolved;
 private Menu m_solved;
 private Menu m_description;
+private Menu m_flag_info;
 
 private Menu m_submenu;
 
@@ -23,6 +24,7 @@ static this()
     m_submit = Menu("Submit a flag", &submit);
     m_solved = Menu("Show solved flags", &solved);
     m_description = Menu("Show flag description", &description);
+    m_flag_info = Menu("Show solve info of flags", &info);
 
     m_unsolved = Menu("Show unsolved flags", 
             [&m_description, &m_submenu, &m_root], &unsolved);
@@ -32,6 +34,7 @@ static this()
             &m_unsolved, 
             &m_solved,
             &m_submit,
+            &m_flag_info,
             &m_root
     ]);
 
@@ -164,6 +167,31 @@ END_SQL";
     return false;
 }
 
+private int info()
+{
+    string fmt = "|%-67s|%-10s|";
+    writefln(fmt, "Challenge Name", "Solves");
+    write(hsep);
+
+    QueryParams p;
+    p.sqlCommand = q"END_SQL
+        SELECT f.name, fi.solves::int
+        FROM v_flag_info fi
+        LEFT JOIN flags f ON f.id=fi.id
+        WHERE f.visible
+        ORDER BY solves DESC
+END_SQL";
+    auto r = conn.execParams(p);
+    scope(exit) destroy(r);
+
+    foreach(row; rangify(r)) {
+        writefln(fmt,
+                row["name"].as!PGtext,
+                row["solves"].as!PGinteger.to!string
+                );
+    }
+    return false;
+}
 private int description()
 {
     string fmt = "|%-6s|%-60s|%-10s|";
