@@ -84,14 +84,36 @@ private int submit()
 
 private int unsolved()
 {
-    string fmt = "|%-70s|%7s|";
+    string fmt = "|%-70s|%-7s|";
     writefln(fmt, "Challenge Name", "Points");
     write(hsep);
 
     if (logged_in) {
         QueryParams p;
-        p.sqlCommand = "SELECT * FROM UNSOLVED($1)";
-        p.argsVariadic(team_name);
+        p.sqlCommand = q"END_SQL
+            SELECT 
+                f.name as flag_name, 
+                points - COALESCE(child_points, 0) as points
+            FROM flags f
+            LEFT JOIN (
+                    SELECT flag_id, submissions FROM v_solves
+                    WHERE team_id=$1 ) as vs
+                ON vs.flag_id=f.id
+            LEFT JOIN (
+                    SELECT SUM(points)::INT as child_points, parent
+                    FROM v_solves
+                    LEFT JOIN flags ON v_solves.flag_id=flags.id
+                    WHERE team_id=$1 AND parent IS NOT NULL
+                    GROUP BY parent
+                    ) as sc
+                ON sc.parent=f.id
+            WHERE 
+                submissions IS NULL
+                AND f.visible
+                AND f.enabled
+                AND f.points - COALESCE(child_points, 0) > 0
+END_SQL";
+        p.argsVariadic(team_id);
 
         auto r = conn.execParams(p);
         scope(exit) destroy(r);
@@ -116,16 +138,23 @@ private int solved()
 
     if (logged_in) {
         QueryParams p;
-        p.sqlCommand = "SELECT * FROM SOLVED($1)";
-        p.argsVariadic(team_name);
+        p.sqlCommand = q"END_SQL
+            SELECT flag_name, points, time
+            FROM v_solves s
+            LEFT JOIN v_valid_submissions vs 
+                ON s.submissions[1]=vs.submission_id
+            LEFT JOIN flags f ON f.id=s.flag_id
+            WHERE s.team_id=$1
+END_SQL";
+        p.argsVariadic(team_id);
 
         auto r = conn.execParams(p);
         scope(exit) destroy(r);
 
         foreach(row; rangify(r)) {
             writefln(fmt,
-                    row["name"].as!PGtext,
-                    row["solved_time"].as!PGtext,
+                    row["flag_name"].as!PGtext,
+                    row["time"].as!PGtext,
                     row["points"].as!PGinteger.to!string
                     );
         }

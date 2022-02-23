@@ -19,6 +19,7 @@ void echo_off()
     if (use_telnet_codes) {
         write("\xff\xfb\x01");
     } else {
+        write(ESC~"30;40m");
     }
 
 }
@@ -28,5 +29,6 @@ void echo_on()
     if (use_telnet_codes) {
         write("\xff\xfc\x01");
     } else {
+        write(RESET);
     }
 }

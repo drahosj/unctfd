@@ -31,17 +31,17 @@ private bool add_ssh_key()
 {
     write("Paste key here: ");
     string sshkey = readln().chomp();
-    auto m = sshkey.matchFirst(r"^ssh-rsa ([A-Za-z0-9+/]+).*$");
+    auto m = sshkey.matchFirst(r"^(ssh-rsa|ssh-dss) ([A-Za-z0-9+/]+).*$");
     if (m.empty) {
         writeln("Invalid SSH key.");
         return false;
     } else {
         QueryParams p;
         p.sqlCommand = q"END_SQL
-            INSERT INTO ssh_keys (team_id, key) 
-            VALUES ($1::int, $2::text)
+            INSERT INTO ssh_keys (team_id, key, key_type) 
+            VALUES ($1::int, $2::text, $3::text)
 END_SQL";
-        p.argsVariadic(team_id, m[1]);
+        p.argsVariadic(team_id, m[2], m[1]);
         conn.execParams(p);
         writeln("Key accepted!");
         write("Keys are added in a batch process, so it");
@@ -63,16 +63,15 @@ private int do_register()
 
     string pass;
     string pass2;
-    {
-        echo_off();
-        scope(exit) echo_on();
+    write("Enter password: ");
+    echo_off();
+    pass = readln().chomp();
+    echo_on();
 
-        write("Enter password: ");
-        pass = readln().chomp();
-
-        write("Confirm password: ");
-        pass2 = readln().chomp();
-    }
+    write("Confirm password: ");
+    echo_off();
+    pass2 = readln().chomp();
+    echo_on();
 
     try {
         if (pass != pass2) {
@@ -106,7 +105,9 @@ private int do_login()
     auto name = readln().chomp();
 
     write("Enter password: ");
+    echo_off();
     auto pass = readln().chomp();
+    echo_on();
 
     QueryParams p;
     p.sqlCommand = "SELECT * FROM teams WHERE name=$1 AND " ~
