@@ -1,0 +1,12 @@
+challenges/
+|- chal1/
+|  |- description.txt
+|  |- flags.csv
+|- chal2/
+|  |- description.txt
+|  |- flags.csv
+|  |- attachments/
+|  |  |- runme.elf
+|  |  |- library.so
+|  |  |- ...
+|- ...
