@@ -1,0 +1,12 @@
+FROM unctfd:latest
+RUN apk add openssh postgresql
+COPY import-keys.sh /
+RUN adduser -h /home/bbs -D bbs     \
+    && passwd -u bbs                \
+    && mkdir -p /home/bbs/.ssh      \
+    && chown bbs /home/bbs/.ssh     \
+    && chmod 0700 /home/bbs/.ssh    \
+    && ssh-keygen -A                \
+    && echo -e "PasswordAuthentication no" >> /etc/ssh/sshd_config
+EXPOSE 2222
+CMD ["/usr/sbin/sshd", "-D", "-p", "2222"]

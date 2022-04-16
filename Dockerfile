@@ -1,6 +1,7 @@
 FROM alpine:latest
 RUN apk add build-base ldc dub libpq-dev
-COPY . /
+COPY dub.json /
+COPY source /source
 RUN dub build
 
 FROM alpine:latest
