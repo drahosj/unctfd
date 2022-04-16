@@ -1,0 +1,6 @@
+[Unit]
+Description=Import SSH keys on a timer
+
+[Service]
+Type=oneshot
+ExecStart=podman exec -u bbs unctfd-ssh /import-keys.sh
