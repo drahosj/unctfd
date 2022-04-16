@@ -7,6 +7,7 @@ import menu;
 import team;
 import art;
 import db;
+import util;
 
 Menu m_root; 
 
@@ -24,8 +25,9 @@ private int root_entry()
 {
     if (logged_in) {
         writeln();
-        writefln("You are currently logged in as %s%s%s", 
+        writefln("You are currently logged in as %s%s%s\n", 
                 T_GREEN, team_name, RESET);
+        show_recent();
     }
     return true;
 }

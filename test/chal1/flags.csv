@@ -1,0 +1,3 @@
+name,points,regexp,visible
+Challenge 1,10,flag{chal1},true
+Challenge 1 Bonus,20,flag{chal1_hidden},false

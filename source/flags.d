@@ -1,6 +1,7 @@
 import std.stdio;
 import std.conv;
 import std.string;
+import std.functional;
 import core.exception;
 
 import dpq2;
@@ -10,6 +11,7 @@ import db;
 import root;
 import team;
 import art;
+import util;
 
 private Menu m_submit;
 private Menu m_unsolved;
@@ -22,11 +24,11 @@ private Menu m_submenu;
 static this()
 {
     m_submit = Menu("Submit a flag", &submit);
-    m_solved = Menu("Show solved flags", &solved);
-    m_description = Menu("Show flag description", &description);
+    m_solved = Menu("List solved flags", &solved);
+    m_description = Menu("Show flag description...", &description);
     m_flag_info = Menu("Show solve info of flags", &info);
 
-    m_unsolved = Menu("Show unsolved flags", 
+    m_unsolved = Menu("List unsolved flags", 
             [&m_description, &m_submenu, &m_root], &unsolved);
 
     m_submenu = Menu("Flags " ~ T_GREEN ~ "->" ~ RESET, [
@@ -36,10 +38,17 @@ static this()
             &m_submit,
             &m_flag_info,
             &m_root
-    ]);
+    ], (&entry).toDelegate);
 
     menus["submit"] = &m_submit;
     menus["flags"] = &m_submenu;
+}
+
+private int entry()
+{
+    show_recent();
+
+    return true;
 }
 
 private long getScore()

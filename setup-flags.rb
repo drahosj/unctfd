@@ -41,11 +41,15 @@ def upload(flags, a)
 end
 
 def normalize(f)
-  replace = '{}_'
   f.gsub!('}', '.')
   f.gsub!('{', '.')
   f.gsub!('_', '.')
-  return f.downcase!
+  f.downcase!
+
+  f = "^#{f}$"
+
+  puts "Normalized to: #{f}"
+  return f
 end
 
 def walk(root)

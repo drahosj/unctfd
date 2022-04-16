@@ -61,7 +61,7 @@ SET default_tablespace = '';
 CREATE TABLE public.attachments (
     name text,
     uri text,
-    flag_id integer,
+    flag_id integer NOT NULL,
     id integer NOT NULL
 );
 

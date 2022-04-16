@@ -1,0 +1,7 @@
+name,points,regexp,visible
+Challenge 3,50,unsolvable,true
+Challenge 3 Part 1,10,flag{chal3_step1},false
+Challenge 3 Part 2,10,flag{chal3_step2},false
+Challenge 3 Part 3,10,flag{chal3_step3},false
+Challenge 3 Part 4,10,flag{chal3_step4},false
+Challenge 3 Part 5,10,flag{chal3_step5},false

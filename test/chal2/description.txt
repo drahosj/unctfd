@@ -1,0 +1,5 @@
+The flag is flag{chal2};
+
+The stage 2 flag is flag{chal2_step2};
+
+These will share a description.

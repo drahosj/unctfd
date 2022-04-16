@@ -1,0 +1,4 @@
+This is a 5-stage challenge. The points
+will decrement for each part submitted.
+
+The parts are flag{chal3_stepN}.

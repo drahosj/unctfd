@@ -95,6 +95,7 @@ private int do_register()
         }
     } catch (ResponseException) {
     }
+
     writeln("Error registering team. Is the name already taken?");
     return false;
 }
