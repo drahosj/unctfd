@@ -1,0 +1,12 @@
+[Unit]
+Description=Unctfd Service
+Requires=unctfd.socket
+
+[Service]
+Type=simple
+ExecStart=/home/bbs/unctfd -c 'dbname=ctf user=bbs host=127.0.0.1'
+StandardInput=socket
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

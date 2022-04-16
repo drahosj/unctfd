@@ -1,0 +1,1 @@
+host=localhost dbname=ctf user=bbs

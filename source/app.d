@@ -15,15 +15,23 @@ import db;
 int  main(string[] args)
 {
     string conn_string = "dbname=ctf";
+    string conn_file;
     string preauthenticate_as;
 
     auto opt = getopt(args, 
             "conn|c", &conn_string,
+            "conn-file|f", &conn_file,
             "preauth|p", "Preauth as team (by team ID)", &preauthenticate_as);
     setbuf(stdout, null);
     if (opt.helpWanted) {
         defaultGetoptPrinter("unctfd: ", opt.options);
         return -1;
+    }
+
+    if (!conn_file.empty) {
+        File cf = File(conn_file, "r");
+        scope(exit) cf.close();
+        conn_string = cf.readln().chomp();
     }
 
     conn = new Connection(conn_string);

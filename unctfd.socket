@@ -1,0 +1,9 @@
+[Unit]
+Description=Unctfd Socket
+
+[Socket]
+ListenStream=127.0.0.1:1337
+Accept=yes
+
+[Install]
+WantedBy=sockets.target
