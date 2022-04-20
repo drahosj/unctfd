@@ -1,0 +1,28 @@
+<html>
+  <head>
+    <title>HTML Scoreboard</title>
+  </head>
+  <body>
+    <table>
+      <tr>
+        <th>Place</th>
+        <th>Team Name</th>
+        <th>score</th>
+      </tr>
+      <%
+        require 'pg'
+        @conn = PG::Connection.new(ENV['CONN_STRING'])
+        @conn.exec("SELECT place, name, score FROM v_scoreboard") do |r|
+          r.each do |row|
+        %>
+          <tr>
+            <td> <%= row['place'] %> </td>
+            <td> <%= row['name'] %> </td>
+            <td> <%= row['score'] %> </td>
+          </tr>
+        <% end %>
+      <% end %>
+    </table>
+  </body>
+</html>
+

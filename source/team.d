@@ -31,7 +31,7 @@ private bool add_ssh_key()
 {
     write("Paste key here: ");
     string sshkey = readln().chomp();
-    auto m = sshkey.matchFirst(r"^(ssh-rsa|ssh-dss) ([A-Za-z0-9+/]+).*$");
+    auto m = sshkey.matchFirst(r"^(ssh-rsa|ssh-dss) ([A-Za-z0-9+/]+)*$");
     if (m.empty) {
         writeln("Invalid SSH key.");
         return false;

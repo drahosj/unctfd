@@ -1,0 +1,59 @@
+<html>
+    <head>
+        <title>
+            <%= ENV['CTF_TITLE'] %>
+        </title>
+    </head>
+    <body>
+        <h1><%= ENV['CTF_TITLE'] %></h1>
+        <h2>Info</h2>
+        <p>
+            This CTF is powered by <a href="https://github.com/drahosj/unctfd">
+            UnCTFd</a>, an uncomplicated CTF engine with philosophical
+            differences from other software commonly used for this purpose. The
+            primary interface is a BBS-like interactive text interface, but a
+            <a href="/scoreboard.html">HTML scoreboard</a> is provided for your
+            convenience.
+        </p>
+        <h2>Accessing UnCTFD</h2>
+        <p>
+            UnCTFd can be accessed on port 1337 (cleartext) or port 2222 (SSH,
+            requires registration). SSH is recommended for flag submissions,
+            especially over a wireless internet connection. Connection command 
+            examples are shown below.
+        </p>
+        <h4>Cleartext</h4>
+        <code>nc <%= ENV['CTF_HOST'] %> 1337</code>
+        <h4>SSH</h4>
+        <code>ssh -p 2222 bbs@<%= ENV['CTF_HOST'] %></code>
+        <h2>Registration</h2>
+        <p>
+            Initial registration must be performed over cleartext. You will be
+            prompted to choose a team name and password (team name regex:
+            <code>^[a-z0-9_\-'☃ ]{1,30}$</code>). You also have the option of
+            adding an SSH key at registration time (additional keys can be added
+            at any time by logging in).
+        </p>
+        <h2>Joining a Team</h2>
+        <p>
+            The easiest way to join a teams is to connect over cleartext, log in
+            with the password, and add your SSH key to the team.
+        </p>
+        <h2>Flags</h2>
+        <p>
+            Each challenge will have one or more flags. Flags are in the format 
+            <code><%=ENV['FLAG_PREFIX']%>{some_text_here}</code>.
+        </p>
+        <h2>Rules</h2>
+        <p>
+            <ul>
+                <li>Practice good sportsmanship. Do not DoS online services or
+                    delete flags once obtained.</li>
+                <li>Do not attack other teams.</li>
+                <li>Avoid exploiting the CTF infrastructure in a manner that
+                    damages the integrity of the competition (such as leaking
+                    flags).</li>
+            </ul>
+        </p>
+    </body>
+</html>
