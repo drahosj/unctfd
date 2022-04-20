@@ -217,6 +217,7 @@ END_SQL";
 
     string[] descriptions = [];
     int[] ids = [];
+    string[] names = [];
     int i = 1;
     foreach(row; rangify(r)) {
         writefln(fmt, (i++).to!string,
@@ -225,6 +226,7 @@ END_SQL";
                 );
         descriptions ~= [row["description"].as!PGtext.idup];
         ids ~= row["id"].as!PGinteger;
+        names ~= row["name"].as!PGtext;
     }
 
     write("Select flag: ");
@@ -232,6 +234,7 @@ END_SQL";
         int flag = readln().chomp().to!int;
 
         writeln();
+        writefln(" == %s%s%s ==\n", T_GREEN, names[flag - 1], RESET);
         writeln(descriptions[flag - 1]);
         writeln();
 
@@ -244,11 +247,13 @@ END_SQL";
         p2.argsVariadic(ids[flag - 1]);
         auto r2 = conn.execParams(p2).rangify();
         if (!r2.empty()) {
-            writeln("Attachments: ");
+            writefln("%sAttachments: %s\n", T_GREEN, RESET);
             foreach(row; r2) {
-                writefln("%s: %s", row["name"].as!PGtext, row["uri"].as!PGtext);
+                writefln("%s%s%s: %s", T_RED, row["name"].as!PGtext, RESET,
+                        row["uri"].as!PGtext);
             }
         }
+        write(hsep);
     } catch (ConvException) {
         writeln("Invalid choice.");
     } catch (RangeError) {

@@ -5,11 +5,11 @@ require 'pg'
 require 'csv'
 
 if ARGV.length < 3
-  puts "setup <dbname> <s3bucketname> <root>"
+  puts "setup <dbstring> <s3bucketname> <root>"
   return
 end
 
-@conn = PG::Connection.new(dbname: ARGV.shift)
+@conn = PG::Connection.new(ARGV.shift)
 
 @bucket = ARGV.shift
 
