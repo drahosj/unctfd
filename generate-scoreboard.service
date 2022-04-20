@@ -3,6 +3,6 @@ Description=Generate static HTML scoreboard
 
 [Service]
 Type=oneshot
-Environment=CONN_STRING='dbname=ctf user=bbs'
+Environment=CONN_STRING='dbname=ctf user=bbs host=127.0.0.1'
 StandardOutput=/srv/www/htdocs/scoreboard.html
 ExecStart=erb /home/ec2-user/unctfd/static/scoreboard.html.erb 
