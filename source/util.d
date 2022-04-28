@@ -15,11 +15,8 @@ void show_recent()
         QueryParams p; 
         p.sqlCommand = q"END_SQL
             SELECT flag_name, points, time
-            FROM v_solves s
-            LEFT JOIN v_valid_submissions vs 
-                ON s.submissions[1]=vs.submission_id
-            LEFT JOIN flags f ON f.id=s.flag_id
-            WHERE s.team_id=$1
+            FROM v_valid_submissions
+            WHERE team_id=$1
             ORDER BY time DESC
             LIMIT 4
 END_SQL";

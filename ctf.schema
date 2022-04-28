@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 11.14
--- Dumped by pg_dump version 14.1
+-- Dumped from database version 12.9
+-- Dumped by pg_dump version 13.6
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -28,17 +28,33 @@ SELECT (CASE WHEN COUNT(*) > 0 THEN true ELSE false END) FROM flags f WHERE subm
 
 
 --
--- Name: submit(text, text); Type: PROCEDURE; Schema: public; Owner: -
+-- Name: submit(integer, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE PROCEDURE public.submit(team_name text, submission text)
-    LANGUAGE sql
-    AS $$
-INSERT INTO submissions (team_id, submission)  SELECT id, submission FROM teams WHERE name=team_name;
-$$;
+CREATE FUNCTION public.submit(team_id integer, submission text, OUT submission_id integer, OUT flag_name text, OUT flag_id integer, OUT points integer, OUT bonus boolean, OUT nsubs integer, OUT parent integer) RETURNS record
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$ 
+BEGIN 
+	INSERT INTO submissions(team_id, submission) 
+	VALUES (team_id, submission) 
+	RETURNING id INTO submission_id; 
+
+	REFRESH MATERIALIZED VIEW v_solves; 
+
+	SELECT 
+		vs.team_id, vs.flag_id, vs.nsubs, vs.points,
+		vs.flag_name, vs.bonus, vs.parent
+	INTO 
+		submit.team_id, submit.flag_id, submit.nsubs, submit.points,
+		submit.flag_name, submit.bonus, submit.parent
+	FROM v_solves vs
+	WHERE submission_id = ANY (submissions);
+END $$;
 
 
 SET default_tablespace = '';
+
+SET default_table_access_method = heap;
 
 --
 -- Name: attachments; Type: TABLE; Schema: public; Owner: -
@@ -79,7 +95,8 @@ CREATE TABLE public.flags (
     points integer,
     regexp text,
     solvable boolean DEFAULT true,
-    parent integer
+    parent integer,
+    bonus boolean DEFAULT false
 );
 
 
@@ -178,45 +195,14 @@ ALTER TABLE public.teams ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 
 --
--- Name: v_flag_info; Type: VIEW; Schema: public; Owner: -
---
-
-CREATE VIEW public.v_flag_info AS
-SELECT
-    NULL::text AS name,
-    NULL::integer AS id,
-    NULL::bigint AS solves,
-    NULL::text[] AS teams;
-
-
---
--- Name: v_solves; Type: VIEW; Schema: public; Owner: -
---
-
-CREATE VIEW public.v_solves AS
- SELECT t.id AS team_id,
-    f.id AS flag_id,
-    array_agg(s.id ORDER BY s."timestamp") AS submissions
-   FROM ((public.submissions s
-     LEFT JOIN public.teams t ON ((s.team_id = t.id)))
-     LEFT JOIN public.flags f ON ((s.submission ~* f.regexp)))
-  WHERE (f.enabled AND f.solvable AND (f.regexp IS NOT NULL))
-  GROUP BY t.id, f.id;
-
-
---
 -- Name: v_scoreboard; Type: VIEW; Schema: public; Owner: -
 --
 
 CREATE VIEW public.v_scoreboard AS
- SELECT row_number() OVER (ORDER BY (sum(f.points)) DESC) AS place,
-    t.name,
-    sum(f.points) AS score
-   FROM ((public.v_solves vs
-     LEFT JOIN public.teams t ON ((t.id = vs.team_id)))
-     LEFT JOIN public.flags f ON ((vs.flag_id = f.id)))
-  GROUP BY t.name
-  ORDER BY (sum(f.points)) DESC;
+SELECT
+    NULL::bigint AS place,
+    NULL::text AS name,
+    NULL::bigint AS score;
 
 
 --
@@ -235,11 +221,10 @@ CREATE VIEW public.v_submission_count AS
 --
 
 CREATE VIEW public.v_team_flags AS
- SELECT v_solves.team_id,
-    count(v_solves.flag_id) AS flag_count,
-    array_agg(v_solves.flag_id) AS flags
-   FROM public.v_solves
-  GROUP BY v_solves.team_id;
+SELECT
+    NULL::integer AS team_id,
+    NULL::bigint AS flag_count,
+    NULL::integer[] AS flags;
 
 
 --
@@ -262,25 +247,14 @@ CREATE VIEW public.v_team_info AS
 --
 
 CREATE VIEW public.v_valid_submissions AS
- SELECT COALESCE(to_char(s."timestamp", 'YYYY-MM-DD HH24:MI:SS'::text), '- -'::text) AS "time",
-    t.name AS team_name,
-    t.id AS team_id,
-    f.name AS flag_name,
-    s.id AS submission_id,
-    f.id AS flag_id
-   FROM (((public.submissions s
-     LEFT JOIN public.v_solves vs ON ((ARRAY[s.id] <@ vs.submissions)))
-     LEFT JOIN public.teams t ON ((t.id = vs.team_id)))
-     LEFT JOIN public.flags f ON ((vs.flag_id = f.id)))
-  WHERE (f.id IS NOT NULL);
-
-
---
--- Name: attachments attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.attachments
-    ADD CONSTRAINT attachments_pkey PRIMARY KEY (id);
+SELECT
+    NULL::text AS "time",
+    NULL::text AS team_name,
+    NULL::integer AS team_id,
+    NULL::text AS flag_name,
+    NULL::integer AS submission_id,
+    NULL::integer AS flag_id,
+    NULL::integer AS points;
 
 
 --
@@ -289,6 +263,35 @@ ALTER TABLE ONLY public.attachments
 
 ALTER TABLE ONLY public.flags
     ADD CONSTRAINT flags_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: v_solves; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.v_solves AS
+ SELECT t.id AS team_id,
+    f.id AS flag_id,
+    array_agg(s.id ORDER BY s."timestamp") AS submissions,
+    count(s.id) AS nsubs,
+    f.name AS flag_name,
+    f.bonus,
+    f.parent,
+    f.points
+   FROM ((public.submissions s
+     LEFT JOIN public.teams t ON ((s.team_id = t.id)))
+     LEFT JOIN public.flags f ON ((s.submission ~* f.regexp)))
+  WHERE (f.enabled AND f.solvable AND (f.regexp IS NOT NULL))
+  GROUP BY t.id, f.id
+  WITH NO DATA;
+
+
+--
+-- Name: attachments attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attachments
+    ADD CONSTRAINT attachments_pkey PRIMARY KEY (id);
 
 
 --
@@ -324,18 +327,49 @@ ALTER TABLE ONLY public.teams
 
 
 --
--- Name: v_flag_info _RETURN; Type: RULE; Schema: public; Owner: -
+-- Name: v_valid_submissions _RETURN; Type: RULE; Schema: public; Owner: -
 --
 
-CREATE OR REPLACE VIEW public.v_flag_info AS
- SELECT f.name,
-    f.id,
-    count(vs.team_id) AS solves,
-    array_agg(t.name) AS teams
-   FROM ((public.flags f
-     LEFT JOIN public.v_solves vs ON ((f.id = vs.flag_id)))
-     LEFT JOIN public.teams t ON ((vs.team_id = t.id)))
-  GROUP BY f.id;
+CREATE OR REPLACE VIEW public.v_valid_submissions AS
+ SELECT COALESCE(to_char(s."timestamp", 'YYYY-MM-DD HH24:MI:SS'::text), '- -'::text) AS "time",
+    t.name AS team_name,
+    t.id AS team_id,
+    f.name AS flag_name,
+    s.id AS submission_id,
+    f.id AS flag_id,
+    f.points
+   FROM (((public.submissions s
+     LEFT JOIN public.v_solves vs ON ((ARRAY[s.id] <@ vs.submissions)))
+     LEFT JOIN public.teams t ON ((t.id = vs.team_id)))
+     LEFT JOIN public.flags f ON ((vs.flag_id = f.id)))
+  WHERE (f.id IS NOT NULL);
+
+
+--
+-- Name: v_scoreboard _RETURN; Type: RULE; Schema: public; Owner: -
+--
+
+CREATE OR REPLACE VIEW public.v_scoreboard AS
+ SELECT row_number() OVER (ORDER BY (sum(f.points)) DESC) AS place,
+    t.name,
+    sum(f.points) AS score
+   FROM ((public.v_solves vs
+     LEFT JOIN public.teams t ON ((t.id = vs.team_id)))
+     LEFT JOIN public.flags f ON ((vs.flag_id = f.id)))
+  GROUP BY t.name
+  ORDER BY (sum(f.points)) DESC;
+
+
+--
+-- Name: v_team_flags _RETURN; Type: RULE; Schema: public; Owner: -
+--
+
+CREATE OR REPLACE VIEW public.v_team_flags AS
+ SELECT v_solves.team_id,
+    count(v_solves.flag_id) AS flag_count,
+    array_agg(v_solves.flag_id) AS flags
+   FROM public.v_solves
+  GROUP BY v_solves.team_id;
 
 
 --
@@ -434,6 +468,13 @@ GRANT SELECT(parent) ON TABLE public.flags TO bbs;
 
 
 --
+-- Name: COLUMN flags.bonus; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(bonus) ON TABLE public.flags TO bbs;
+
+
+--
 -- Name: TABLE ssh_keys; Type: ACL; Schema: public; Owner: -
 --
 
@@ -448,6 +489,13 @@ GRANT INSERT ON TABLE public.submissions TO bbs;
 
 
 --
+-- Name: COLUMN submissions.id; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT(id) ON TABLE public.submissions TO bbs;
+
+
+--
 -- Name: TABLE teams; Type: ACL; Schema: public; Owner: -
 --
 
@@ -455,52 +503,10 @@ GRANT SELECT,INSERT ON TABLE public.teams TO bbs;
 
 
 --
--- Name: TABLE v_flag_info; Type: ACL; Schema: public; Owner: -
---
-
-GRANT SELECT ON TABLE public.v_flag_info TO bbs;
-
-
---
--- Name: TABLE v_solves; Type: ACL; Schema: public; Owner: -
---
-
-GRANT SELECT ON TABLE public.v_solves TO bbs;
-
-
---
--- Name: TABLE v_scoreboard; Type: ACL; Schema: public; Owner: -
---
-
-GRANT SELECT ON TABLE public.v_scoreboard TO bbs;
-
-
---
 -- Name: TABLE v_submission_count; Type: ACL; Schema: public; Owner: -
 --
 
 GRANT SELECT ON TABLE public.v_submission_count TO bbs;
-
-
---
--- Name: TABLE v_team_flags; Type: ACL; Schema: public; Owner: -
---
-
-GRANT SELECT ON TABLE public.v_team_flags TO bbs;
-
-
---
--- Name: TABLE v_team_info; Type: ACL; Schema: public; Owner: -
---
-
-GRANT SELECT ON TABLE public.v_team_info TO bbs;
-
-
---
--- Name: TABLE v_valid_submissions; Type: ACL; Schema: public; Owner: -
---
-
-GRANT SELECT ON TABLE public.v_valid_submissions TO bbs;
 
 
 --

@@ -79,15 +79,38 @@ private int submit()
         
         long pre_score = getScore();
         QueryParams p;
-        p.sqlCommand = "CALL SUBMIT($1, $2)";
-        p.argsVariadic(team_name, flag);
-        conn.execParams(p);
+        p.sqlCommand = "SELECT * FROM SUBMIT($1, $2)";
+        p.argsVariadic(team_id, flag);
+        auto r = conn.execParams(p);
+        scope (exit) destroy(r);
+        auto row = r[0];
 
-        if (getScore() > pre_score) {
-            writefln("The submission was %sCORRECT%s!", T_GREEN, RESET);
-        } else {
+        if (row["flag_name"].isNull()) {
             writefln("The submission was %sINCORRECT%s!", T_RED, RESET);
+            return false;
         }
+
+        auto flag_name = row["flag_name"].as!PGtext;
+        auto flag_points = row["points"].as!PGinteger;
+
+        if (row["nsubs"].as!PGinteger > 1) {
+            writefln("%sCORRECT%s but already submitted!", T_GREEN, RESET);
+            writefln("\tFlag name: %s", flag_name);
+            return false;
+        } 
+        if (row["bonus"].as!PGboolean) {
+            writefln("%sBONUS FLAG%s %s (%d points)",
+                    T_GREEN, RESET, flag_name, flag_points);
+            return false;
+        }
+        writefln("The submission was %sCORRECT%s!", T_GREEN, RESET);
+        writefln("\tFlag name: %s (%d points)", flag_name, flag_points);
+
+        if (!row["parent"].isNull()) {
+            // TODO: Calculate remaining value of parent
+            writefln("This is part of a meta-flag.");
+            writefln("More info is a TODO");
+        } 
     } else {
         writeln("Not logged in");
     }
