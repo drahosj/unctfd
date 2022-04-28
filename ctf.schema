@@ -17,17 +17,23 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: check_submission(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.check_submission(submission text) RETURNS boolean
+    LANGUAGE sql
+    AS $$
+SELECT (CASE WHEN COUNT(*) > 0 THEN true ELSE false END) FROM flags f WHERE submission ~* f.regexp
+ $$;
+
+
+--
 -- Name: solved(integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
 CREATE FUNCTION public.solved(team_id integer) RETURNS TABLE(flag_id integer, flag_name text, points integer, parent integer, bonus boolean, "time" text)
     LANGUAGE sql
-    AS $$ 
-	SELECT v_solves.flag_id, v_solves.flag_name, v_solves.points, v_solves.parent, v_solves.bonus, v_valid_submissions.time 
-	FROM v_solves 
-	LEFT JOIN v_valid_submissions ON v_solves.submissions[1]=v_valid_Submissions.submission_id 
-	WHERE v_solves.team_id=v_valid_submissions.team_id; 
-$$;
+    AS $$ SELECT v_solves.flag_id, v_solves.flag_name, v_solves.points, v_solves.parent, v_solves.bonus, v_valid_submissions.time FROM v_solves LEFT JOIN v_valid_submissions ON v_solves.submissions[1]=v_valid_Submissions.submission_id WHERE v_solves.team_id=v_valid_submissions.team_id; $$;
 
 
 --
@@ -62,10 +68,7 @@ END $$;
 CREATE FUNCTION public.unsolved(team_id integer) RETURNS TABLE(flag_id integer, flag_name text, points integer, parent integer, bonus boolean)
     LANGUAGE sql
     AS $$
-	SELECT flags.id, flags.name, flags.points, flags.parent, flags.bonus 
-	FROM flags 
-	LEFT JOIN solved(team_id) ON flags.id=flag_id 
-	WHERE solved.flag_id IS NULL AND flags.visible;
+select flags.id, flags.name, flags.points, flags.parent, flags.bonus from flags left join solved(1) on flags.id=flag_id where solved.flag_id is null and flags.visible;
 $$;
 
 
@@ -127,6 +130,19 @@ ALTER TABLE public.flags ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     NO MINVALUE
     NO MAXVALUE
     CACHE 1
+);
+
+
+--
+-- Name: metaflags; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.metaflags (
+    id integer NOT NULL,
+    visible boolean,
+    name text,
+    description text,
+    points text
 );
 
 
@@ -311,6 +327,14 @@ ALTER TABLE ONLY public.attachments
 
 
 --
+-- Name: metaflags metaflags_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.metaflags
+    ADD CONSTRAINT metaflags_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: ssh_keys ssh_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -343,25 +367,6 @@ ALTER TABLE ONLY public.teams
 
 
 --
--- Name: v_valid_submissions _RETURN; Type: RULE; Schema: public; Owner: -
---
-
-CREATE OR REPLACE VIEW public.v_valid_submissions AS
- SELECT COALESCE(to_char(s."timestamp", 'YYYY-MM-DD HH24:MI:SS'::text), '- -'::text) AS "time",
-    t.name AS team_name,
-    t.id AS team_id,
-    f.name AS flag_name,
-    s.id AS submission_id,
-    f.id AS flag_id,
-    f.points
-   FROM (((public.submissions s
-     LEFT JOIN public.v_solves vs ON ((ARRAY[s.id] <@ vs.submissions)))
-     LEFT JOIN public.teams t ON ((t.id = vs.team_id)))
-     LEFT JOIN public.flags f ON ((vs.flag_id = f.id)))
-  WHERE (f.id IS NOT NULL);
-
-
---
 -- Name: v_scoreboard _RETURN; Type: RULE; Schema: public; Owner: -
 --
 
@@ -389,6 +394,25 @@ CREATE OR REPLACE VIEW public.v_team_flags AS
 
 
 --
+-- Name: v_valid_submissions _RETURN; Type: RULE; Schema: public; Owner: -
+--
+
+CREATE OR REPLACE VIEW public.v_valid_submissions AS
+ SELECT COALESCE(to_char(s."timestamp", 'YYYY-MM-DD HH24:MI:SS'::text), '- -'::text) AS "time",
+    t.name AS team_name,
+    t.id AS team_id,
+    f.name AS flag_name,
+    s.id AS submission_id,
+    f.id AS flag_id,
+    f.points
+   FROM (((public.submissions s
+     LEFT JOIN public.v_solves vs ON ((ARRAY[s.id] <@ vs.submissions)))
+     LEFT JOIN public.teams t ON ((t.id = vs.team_id)))
+     LEFT JOIN public.flags f ON ((vs.flag_id = f.id)))
+  WHERE (f.id IS NOT NULL);
+
+
+--
 -- Name: attachments attachments_flag_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -401,7 +425,7 @@ ALTER TABLE ONLY public.attachments
 --
 
 ALTER TABLE ONLY public.flags
-    ADD CONSTRAINT flag_parent_fkey FOREIGN KEY (parent) REFERENCES public.flags(id);
+    ADD CONSTRAINT flag_parent_fkey FOREIGN KEY (parent) REFERENCES public.metaflags(id);
 
 
 --
