@@ -31,15 +31,7 @@ SELECT (CASE WHEN COUNT(*) > 0 THEN true ELSE false END) FROM flags f WHERE subm
 -- Name: solved(integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.solved(team_id integer) 
-RETURNS TABLE (
-	flag_id integer, 
-	flag_name text, 
-	points integer, 
-	parent integer, 
-	bonus boolean, 
-	"time" text
-	)
+CREATE FUNCTION public.solved(team_id integer) RETURNS TABLE(flag_id integer, flag_name text, points integer, parent integer, bonus boolean, "time" text)
     LANGUAGE sql
     AS $$ 
 	SELECT v_solves.flag_id, v_solves.flag_name, 
@@ -56,18 +48,7 @@ $$;
 -- Name: submit(integer, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.submit(
-	team_id INT, 
-	submission TEXT, 
-	OUT submission_id INTEGER, 
-	OUT flag_name TEXT, 
-	OUT flag_id INTEGER, 
-	OUT points INTEGER, 
-	OUT bonus boolean, 
-	OUT nsubs INTEGER, 
-	OUT parent INTEGER
-	) 
-	RETURNS RECORD
+CREATE FUNCTION public.submit(team_id integer, submission text, OUT submission_id integer, OUT flag_name text, OUT flag_id integer, OUT points integer, OUT bonus boolean, OUT nsubs integer, OUT parent integer) RETURNS record
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$ 
 BEGIN 
@@ -92,15 +73,8 @@ END $$;
 -- Name: unsolved(integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.unsolved(team_id integer) 
-RETURNS TABLE (
-	flag_id INT, 
-	flag_name TEXT, 
-	points INT, 
-	parent INT, 
-	bonus BOOLEAN
-	)
-    LANGUAGE SQL
+CREATE FUNCTION public.unsolved(team_id integer) RETURNS TABLE(flag_id integer, flag_name text, points integer, parent integer, bonus boolean)
+    LANGUAGE sql
     AS $$
 	SELECT 
 		flags.id, 
@@ -120,8 +94,7 @@ $$;
 -- Name: unsolved_meta(integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.unsolved_meta(team_id integer) 
-RETURNS TABLE(id integer, name text, points integer)
+CREATE FUNCTION public.unsolved_meta(team_id integer) RETURNS TABLE(id integer, name text, points integer)
     LANGUAGE sql
     AS $$
 	SELECT 
@@ -145,10 +118,11 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.attachments (
-    name text,
-    uri text,
-    flag_id integer NOT NULL,
-    id integer NOT NULL
+    name text DEFAULT ''::text,
+    uri text DEFAULT ''::text,
+    flag_id integer,
+    id integer NOT NULL,
+    metaflag_id integer
 );
 
 
@@ -174,10 +148,10 @@ CREATE TABLE public.flags (
     id integer NOT NULL,
     visible boolean DEFAULT true,
     enabled boolean DEFAULT true,
-    name text,
+    name text DEFAULT ''::text,
     description text DEFAULT ''::text,
-    points integer,
-    regexp text,
+    points integer DEFAULT 0,
+    regexp text DEFAULT ''::text,
     parent integer,
     bonus boolean DEFAULT false
 );
@@ -204,9 +178,9 @@ ALTER TABLE public.flags ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 CREATE TABLE public.metaflags (
     id integer NOT NULL,
     visible boolean DEFAULT true,
-    name text,
-    description text,
-    points integer
+    name text DEFAULT ''::text,
+    description text DEFAULT ''::text,
+    points integer DEFAULT 0
 );
 
 
@@ -227,6 +201,20 @@ CREATE SEQUENCE public.metaflags_id_seq
 --
 
 ALTER SEQUENCE public.metaflags_id_seq OWNED BY public.metaflags.id;
+
+
+--
+-- Name: metaflags_id_seq1; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.metaflags ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.metaflags_id_seq1
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
@@ -288,8 +276,8 @@ ALTER TABLE public.submissions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY 
 
 CREATE TABLE public.teams (
     id integer NOT NULL,
-    name text,
-    enabled boolean,
+    name text DEFAULT ''::text,
+    enabled boolean DEFAULT true,
     hash text,
     CONSTRAINT team_name_regex CHECK ((name ~* '^[a-z0-9_\-''☃ ]{1,30}$'::text))
 );
@@ -307,6 +295,17 @@ ALTER TABLE public.teams ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     NO MAXVALUE
     CACHE 1
 );
+
+
+--
+-- Name: v_flag_info; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.v_flag_info AS
+SELECT
+    NULL::text AS name,
+    NULL::integer AS flag_id,
+    NULL::integer AS solves;
 
 
 --
@@ -370,13 +369,6 @@ SELECT
     NULL::integer AS submission_id,
     NULL::integer AS flag_id,
     NULL::integer AS points;
-
-
---
--- Name: metaflags id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.metaflags ALTER COLUMN id SET DEFAULT nextval('public.metaflags_id_seq'::regclass);
 
 
 --
@@ -503,11 +495,34 @@ CREATE OR REPLACE VIEW public.v_valid_submissions AS
 
 
 --
+-- Name: v_flag_info _RETURN; Type: RULE; Schema: public; Owner: -
+--
+
+CREATE OR REPLACE VIEW public.v_flag_info AS
+ SELECT v_solves.flag_name AS name,
+    v_solves.flag_id,
+    (count(v_solves.team_id))::integer AS solves
+   FROM (public.v_solves
+     LEFT JOIN public.flags ON ((v_solves.flag_id = flags.id)))
+  WHERE flags.visible
+  GROUP BY v_solves.flag_id, v_solves.flag_name
+  ORDER BY ((count(v_solves.team_id))::integer) DESC;
+
+
+--
 -- Name: attachments attachments_flag_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.attachments
     ADD CONSTRAINT attachments_flag_id_fkey FOREIGN KEY (flag_id) REFERENCES public.flags(id);
+
+
+--
+-- Name: attachments attachments_metaflag_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attachments
+    ADD CONSTRAINT attachments_metaflag_id_fkey FOREIGN KEY (metaflag_id) REFERENCES public.metaflags(id);
 
 
 --

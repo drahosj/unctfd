@@ -21,18 +21,20 @@ private Menu m_flag_info;
 
 private Menu m_submenu;
 
+private int[] last_ids = [];
+private bool[] last_metas = [];
+
 static this()
 {
     m_submit = Menu("Submit a flag", &submit);
-    m_solved = Menu("List solved flags", &solved);
+    m_solved = Menu("List solved flags", [&m_description, &m_submenu], &solved);
     m_description = Menu("Show flag description...", &description);
     m_flag_info = Menu("Show solve info of flags", &info);
 
     m_unsolved = Menu("List unsolved flags", 
-            [&m_description, &m_submenu, &m_root], &unsolved);
+            [&m_description, &m_submenu], &unsolved);
 
     m_submenu = Menu("Flags " ~ T_GREEN ~ "->" ~ RESET, [
-            &m_description, 
             &m_unsolved, 
             &m_solved,
             &m_submit,
@@ -107,9 +109,18 @@ private int submit()
         writefln("\tFlag name: %s (%d points)", flag_name, flag_points);
 
         if (!row["parent"].isNull()) {
-            // TODO: Calculate remaining value of parent
-            writefln("This is part of a meta-flag.");
-            writefln("More info is a TODO");
+            p.sqlCommand = q"END_SQL
+                SELECT name, points 
+                FROM unsolved_meta($1)
+                WHERE id=$2
+END_SQL";
+            p.argsVariadic(team_id, row["parent"].as!PGinteger);
+            auto r2 = conn.execParams(p);
+            scope (exit) destroy(r);
+            auto row2 = r2[0];
+            writefln("\t%s%d%s points remain in the %s%s%s meta-flag.",
+                    T_GREEN, row2["points"].as!PGinteger, RESET,
+                    T_GREEN, row2["name"].as!PGtext, RESET);
         } 
     } else {
         writeln("Not logged in");
@@ -119,34 +130,49 @@ private int submit()
 
 private int unsolved()
 {
-    string fmt = "|%-70s|%-7s|";
-    writefln(fmt, "Challenge Name", "Points");
+    string fmt = "%-4s|%-66s|%s%-7s%s|";
+    writefln(fmt, "", "Challenge Name", "", "Points", "");
     write(hsep);
 
     if (logged_in) {
         QueryParams p;
-        p.sqlCommand = "SELECT * FROM unsolved($1)";
+        p.sqlCommand = q"END_SQL
+            SELECT flag_id AS id, flag_name AS name, points, false AS meta 
+            FROM unsolved($1)
+            UNION SELECT id, name, points, true AS meta
+            FROM unsolved_meta($1)
+            WHERE points > 0
+END_SQL";
         p.argsVariadic(team_id);
 
         auto r = conn.execParams(p);
         scope(exit) destroy(r);
 
+        last_ids = [];
+        last_metas = [];
+        int i = 0;
         foreach(row; rangify(r)) {
+            i++;
+            last_ids ~= [row["id"].as!PGinteger];
+            last_metas ~= [row["meta"].as!PGboolean];
             writefln(fmt,
-                    row["flag_name"].as!PGtext,
-                    row["points"].as!PGinteger.to!string
+                    i.to!string,
+                    row["name"].as!PGtext,
+                    row["meta"].as!PGboolean ? T_RED : T_GREEN,
+                    row["points"].as!PGinteger.to!string,
+                    RESET
                     );
         }
     } else {
         writeln("Not logged in!");
     }
-    return false;
+    return true;
 }
 
 private int solved()
 {
-    string fmt = "|%-40s|%-30s|%-6s|";
-    writefln(fmt, "Challenge Name", "Solve timestamp", "Points");
+    string fmt = "%-4s|%-40s|%-26s|%-6s|";
+    writefln(fmt, "", "Challenge Name", "Solve timestamp", "Points");
     write(hsep);
 
     if (logged_in) {
@@ -159,8 +185,15 @@ END_SQL";
         auto r = conn.execParams(p);
         scope(exit) destroy(r);
 
+        last_ids = [];
+        last_metas = [];
+        int i = 0;
         foreach(row; rangify(r)) {
+            i++;
+            last_ids ~= [row["flag_id"].as!PGinteger];
+            last_metas ~= [false];
             writefln(fmt,
+                    i.to!string,
                     row["flag_name"].as!PGtext,
                     row["time"].as!PGtext,
                     row["points"].as!PGinteger.to!string
@@ -169,7 +202,7 @@ END_SQL";
     } else {
         writeln("Not logged in!");
     }
-    return false;
+    return true;
 }
 
 private int info()
@@ -179,13 +212,7 @@ private int info()
     write(hsep);
 
     QueryParams p;
-    p.sqlCommand = q"END_SQL
-        SELECT f.name, fi.solves::int
-        FROM v_flag_info fi
-        LEFT JOIN flags f ON f.id=fi.id
-        WHERE f.visible
-        ORDER BY solves DESC
-END_SQL";
+    p.sqlCommand = "SELECT name, solves FROM v_flag_info";
     auto r = conn.execParams(p);
     scope(exit) destroy(r);
 
@@ -199,54 +226,44 @@ END_SQL";
 }
 private int description()
 {
-    string fmt = "|%-6s|%-60s|%-10s|";
-    writefln(fmt, "", "Challenge Name", "Points");
-    write(hsep);
-
-    QueryParams p;
-    p.sqlCommand = q"END_SQL
-        SELECT name, points, description, id FROM FLAGS WHERE visible
-END_SQL";
-
-    auto r = conn.execParams(p);
-    scope(exit) destroy(r);
-
-    string[] descriptions = [];
-    int[] ids = [];
-    string[] names = [];
-    int i = 1;
-    foreach(row; rangify(r)) {
-        writefln(fmt, (i++).to!string,
-                row["name"].as!PGtext,
-                row["points"].as!PGinteger.to!string
-                );
-        descriptions ~= [row["description"].as!PGtext.idup];
-        ids ~= row["id"].as!PGinteger;
-        names ~= row["name"].as!PGtext;
+    if (last_ids.length == 0) {
+        writeln("No flags listed...");
+        return false;
     }
 
-    write("Select flag: ");
+    write("Select flag by number above: ");
     try {
         int flag = readln().chomp().to!int;
 
+        QueryParams p;
+        p.sqlCommand = last_metas[flag - 1] ? 
+                "SELECT name, description, points FROM metaflags WHERE id=$1" :
+                "SELECT name, description, points FROM flags WHERE id=$1";
+        p.argsVariadic(last_ids[flag - 1]);
+        auto r = conn.execParams(p);
+        scope (exit) destroy(r);
+        auto row = r[0];
+
         writeln();
-        writefln(" == %s%s%s ==\n", T_GREEN, names[flag - 1], RESET);
-        writeln(descriptions[flag - 1]);
+        writefln(" == %s%s%s ==\n", T_GREEN, row["name"].as!PGtext, RESET);
+        writeln(row["description"].as!PGtext);
         writeln();
 
         QueryParams p2;
-        p2.sqlCommand = q"END_SQL
+        p2.sqlCommand = last_metas[flag - 1] ? q"END_SQL
             SELECT attachments.name, uri FROM attachments 
-            LEFT JOIN flags ON flag_id = flags.id 
-            WHERE flags.id = $1
+            WHERE metaflag_id = $1
+END_SQL" : q"END_SQL
+            SELECT attachments.name, uri FROM attachments
+            WHERE flag_id = $1
 END_SQL";
-        p2.argsVariadic(ids[flag - 1]);
+        p2.argsVariadic(last_ids[flag - 1]);
         auto r2 = conn.execParams(p2).rangify();
         if (!r2.empty()) {
             writefln("%sAttachments: %s\n", T_GREEN, RESET);
-            foreach(row; r2) {
-                writefln("%s%s%s: %s", T_RED, row["name"].as!PGtext, RESET,
-                        row["uri"].as!PGtext);
+            foreach(row2; r2) {
+                writefln("%s%s%s: %s", T_RED, row2["name"].as!PGtext, RESET,
+                        row2["uri"].as!PGtext);
             }
         }
         write(hsep);
