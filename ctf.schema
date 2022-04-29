@@ -31,16 +31,43 @@ SELECT (CASE WHEN COUNT(*) > 0 THEN true ELSE false END) FROM flags f WHERE subm
 -- Name: solved(integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.solved(team_id integer) RETURNS TABLE(flag_id integer, flag_name text, points integer, parent integer, bonus boolean, "time" text)
+CREATE FUNCTION public.solved(team_id integer) 
+RETURNS TABLE (
+	flag_id integer, 
+	flag_name text, 
+	points integer, 
+	parent integer, 
+	bonus boolean, 
+	"time" text
+	)
     LANGUAGE sql
-    AS $$ SELECT v_solves.flag_id, v_solves.flag_name, v_solves.points, v_solves.parent, v_solves.bonus, v_valid_submissions.time FROM v_solves LEFT JOIN v_valid_submissions ON v_solves.submissions[1]=v_valid_Submissions.submission_id WHERE v_solves.team_id=v_valid_submissions.team_id; $$;
+    AS $$ 
+	SELECT v_solves.flag_id, v_solves.flag_name, 
+		v_solves.points, v_solves.parent, v_solves.bonus, 
+		v_valid_submissions.time 
+	FROM v_solves 
+	LEFT JOIN v_valid_submissions 
+	ON v_solves.submissions[1]=v_valid_Submissions.submission_id 
+	WHERE v_solves.team_id=solved.team_id; 
+$$;
 
 
 --
 -- Name: submit(integer, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.submit(team_id integer, submission text, OUT submission_id integer, OUT flag_name text, OUT flag_id integer, OUT points integer, OUT bonus boolean, OUT nsubs integer, OUT parent integer) RETURNS record
+CREATE FUNCTION public.submit(
+	team_id INT, 
+	submission TEXT, 
+	OUT submission_id INTEGER, 
+	OUT flag_name TEXT, 
+	OUT flag_id INTEGER, 
+	OUT points INTEGER, 
+	OUT bonus boolean, 
+	OUT nsubs INTEGER, 
+	OUT parent INTEGER
+	) 
+	RETURNS RECORD
     LANGUAGE plpgsql SECURITY DEFINER
     AS $$ 
 BEGIN 
@@ -65,10 +92,47 @@ END $$;
 -- Name: unsolved(integer); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.unsolved(team_id integer) RETURNS TABLE(flag_id integer, flag_name text, points integer, parent integer, bonus boolean)
+CREATE FUNCTION public.unsolved(team_id integer) 
+RETURNS TABLE (
+	flag_id INT, 
+	flag_name TEXT, 
+	points INT, 
+	parent INT, 
+	bonus BOOLEAN
+	)
+    LANGUAGE SQL
+    AS $$
+	SELECT 
+		flags.id, 
+		flags.name, 
+		flags.points, 
+		flags.parent, 
+		flags.bonus 
+	FROM flags 
+	LEFT JOIN solved(1) 
+	ON flags.id=flag_id 
+	WHERE solved.flag_id 
+	IS NULL AND flags.visible;
+$$;
+
+
+--
+-- Name: unsolved_meta(integer); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.unsolved_meta(team_id integer) 
+RETURNS TABLE(id integer, name text, points integer)
     LANGUAGE sql
     AS $$
-select flags.id, flags.name, flags.points, flags.parent, flags.bonus from flags left join solved(1) on flags.id=flag_id where solved.flag_id is null and flags.visible;
+	SELECT 
+		metaflags.id, 
+		metaflags.name, 
+		metaflags.points - coalesce(sum(solved.points), 0)::integer as points 
+	FROM metaflags 
+	FULL OUTER JOIN solved(unsolved_meta.team_id) 
+	ON solved.parent=metaflags.id 
+	WHERE metaflags.id IS NOT NULL
+	GROUP BY metaflags.id
 $$;
 
 
@@ -139,11 +203,30 @@ ALTER TABLE public.flags ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 CREATE TABLE public.metaflags (
     id integer NOT NULL,
-    visible boolean,
+    visible boolean DEFAULT true,
     name text,
     description text,
-    points text
+    points integer
 );
+
+
+--
+-- Name: metaflags_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.metaflags_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: metaflags_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.metaflags_id_seq OWNED BY public.metaflags.id;
 
 
 --
@@ -287,6 +370,13 @@ SELECT
     NULL::integer AS submission_id,
     NULL::integer AS flag_id,
     NULL::integer AS points;
+
+
+--
+-- Name: metaflags id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.metaflags ALTER COLUMN id SET DEFAULT nextval('public.metaflags_id_seq'::regclass);
 
 
 --
