@@ -1,8 +1,8 @@
 #! /usr/bin/env ruby
 
-require 'aws-sdk-s3'
 require 'pg'
 require 'csv'
+require 'yaml'
 
 if ARGV.length < 3
   puts "setup <dbstring> <s3bucketname> <root>"
@@ -13,8 +13,10 @@ end
 
 @bucket = ARGV.shift
 
-
-@s3 = Aws::S3::Client.new
+unless @bucket == '-'
+  require 'aws-sdk-s3'
+  @s3 = Aws::S3::Client.new
+end
 
 def upload(flags, a)
   response = @s3.put_object(
@@ -60,36 +62,50 @@ def walk(root)
     next unless Dir.exists?(d)
     Dir.chdir(d)
     puts "Entered #{Dir.pwd}"
-    if Dir.children('.').include?"flags.csv"
-      csv = CSV.new(IO.read("flags.csv"), headers: true);
-      desc = ''
+    if Dir.children('.').include?"flags.yaml"
+      yml = YAML.load(IO.read("flags.yaml"))
 
-      if Dir.children('.').include?"description.txt"
-        desc = IO.read("description.txt")
-      end
+      mf_tags = {}
 
-      flags = []
-
-      csv.each do |r|
-        r = r.to_a
-        p r
-        name = r[0].last
-        points = r[1].last
-        regexp = normalize(r[2].last)
-        visible = r[3].last
-        f = @conn.exec_params(<<-END_SQL, [name, desc, points, regexp, visible])
-          INSERT INTO flags
-            (name, description, points, regexp, visible)
+      yml['metaflags'].each do |mf|
+        name = mf['name']
+        desc = mf['desc']
+        points = mf['points']
+        f = @conn.exec_params(<<-END_SQL, [name, desc, points])
+          INSERT INTO metaflags
+            (name, description, points)
           VALUES
-            ($1, $2, $3, $4, $5)
+            ($1, $2, $3)
           RETURNING id
         END_SQL
-        p f
-        flags << f[0]['id']
-        p flags
+        mf_tags[mf['tag']] = f.first['id']
       end
 
-      if Dir.children('.').include?"attachments"
+      yml['flags'].each do |f|
+        name = f['name']
+        desc = f['desc']
+        points = f['points']
+        regexp = f['regexp']
+        meta_tag = f['meta']
+        bonus = f['bonus'] ? true : false
+        visible = f['hidden'] ? false : meta_tag ? false : true
+
+        if name.nil? or points.nil? or regexp.nil?
+          puts "SKIPPING FLAG WITH MISSING MANDATORY FIELDS!"
+          next
+        end
+
+        f = @conn.exec_params(<<-END_SQL, [name, desc, points, regexp, visible, mf_tags[meta_tag]])
+          INSERT INTO flags
+            (name, description, points, regexp, visible, parent)
+          VALUES
+            ($1, $2, $3, $4, $5, $6)
+          RETURNING id
+        END_SQL
+      end
+
+      if Dir.children('.').include?"attachments" and @bucket != '-'
+        puts "Uploading attachments"
         Dir.chdir("attachments");
         Dir.children('.').each do |a|
           upload(flags, a) unless a[0] == '.'

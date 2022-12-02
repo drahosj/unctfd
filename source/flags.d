@@ -2,6 +2,7 @@ import std.stdio;
 import std.conv;
 import std.string;
 import std.functional;
+import std.typecons;
 import core.exception;
 
 import dpq2;
@@ -21,8 +22,11 @@ private Menu m_flag_info;
 
 private Menu m_submenu;
 
-private int[] last_ids = [];
-private bool[] last_metas = [];
+/* Used to track IDs when flags are printed so the 
+ * displayed index can be converted to an ID
+ */
+alias FlagIndex = Tuple!(int, "id", bool, "meta");
+private FlagIndex[] last_print;
 
 static this()
 {
@@ -148,15 +152,15 @@ END_SQL";
         auto r = conn.execParams(p);
         scope(exit) destroy(r);
 
-        last_ids = [];
-        last_metas = [];
+        last_print = [];
         int i = 0;
         foreach(row; rangify(r)) {
             i++;
-            last_ids ~= [row["id"].as!PGinteger];
-            last_metas ~= [row["meta"].as!PGboolean];
+            last_print ~= FlagIndex(
+                    row["id"].as!PGinteger,
+                    row["meta"].as!PGboolean);
             writefln(fmt,
-                    i.to!string,
+                    i + 1,
                     row["name"].as!PGtext,
                     row["meta"].as!PGboolean ? T_RED : T_GREEN,
                     row["points"].as!PGinteger.to!string,
@@ -185,15 +189,15 @@ END_SQL";
         auto r = conn.execParams(p);
         scope(exit) destroy(r);
 
-        last_ids = [];
-        last_metas = [];
+        last_print = [];
         int i = 0;
         foreach(row; rangify(r)) {
             i++;
-            last_ids ~= [row["flag_id"].as!PGinteger];
-            last_metas ~= [false];
+            last_print ~= FlagIndex(
+                    row["id"].as!PGinteger,
+                    row["meta"].as!PGboolean);
             writefln(fmt,
-                    i.to!string,
+                    i + 1,
                     row["flag_name"].as!PGtext,
                     row["time"].as!PGtext,
                     row["points"].as!PGinteger.to!string
@@ -226,7 +230,7 @@ private int info()
 }
 private int description()
 {
-    if (last_ids.length == 0) {
+    if (last_print.length == 0) {
         writeln("No flags listed...");
         return false;
     }
@@ -236,10 +240,10 @@ private int description()
         int flag = readln().chomp().to!int;
 
         QueryParams p;
-        p.sqlCommand = last_metas[flag - 1] ? 
+        p.sqlCommand = last_print[flag - 1].meta ? 
                 "SELECT name, description, points FROM metaflags WHERE id=$1" :
                 "SELECT name, description, points FROM flags WHERE id=$1";
-        p.argsVariadic(last_ids[flag - 1]);
+        p.argsVariadic(last_print[flag - 1].id);
         auto r = conn.execParams(p);
         scope (exit) destroy(r);
         auto row = r[0];
@@ -250,14 +254,14 @@ private int description()
         writeln();
 
         QueryParams p2;
-        p2.sqlCommand = last_metas[flag - 1] ? q"END_SQL
+        p2.sqlCommand = last_print[flag - 1].meta ? q"END_SQL
             SELECT attachments.name, uri FROM attachments 
             WHERE metaflag_id = $1
 END_SQL" : q"END_SQL
             SELECT attachments.name, uri FROM attachments
             WHERE flag_id = $1
 END_SQL";
-        p2.argsVariadic(last_ids[flag - 1]);
+        p2.argsVariadic(last_print[flag - 1].id);
         auto r2 = conn.execParams(p2).rangify();
         if (!r2.empty()) {
             writefln("%sAttachments: %s\n", T_GREEN, RESET);

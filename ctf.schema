@@ -185,30 +185,13 @@ CREATE TABLE public.metaflags (
 
 
 --
--- Name: metaflags_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.metaflags_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
 -- Name: metaflags_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.metaflags_id_seq OWNED BY public.metaflags.id;
 
-
---
--- Name: metaflags_id_seq1; Type: SEQUENCE; Schema: public; Owner: -
---
-
 ALTER TABLE public.metaflags ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME public.metaflags_id_seq1
+    SEQUENCE NAME public.metaflags_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE

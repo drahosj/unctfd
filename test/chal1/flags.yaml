@@ -1,0 +1,48 @@
+---
+metaflags:
+    - name: Test Metaflag
+      points: 1000
+      desc: |
+        Test description of the flag.
+
+        Probably has multiple lines and stuff. Should
+        be pretty straightforward
+      tag: 1
+    - name: Test Metaflag 2
+      point: 200
+      desc: Short description
+      tag: 2
+flags:
+    - name: Simple Flag 1
+      points: 100
+      desc: Simple Flag Description
+      regexp: flag{test}
+    - name: Bonus Flag 1
+      points: 50
+      regexp: flag{bonus}
+      bonus: true
+    - name: Meta 1 Part 1
+      points: 250
+      regexp: flag{m1p1}
+      meta: 1
+    - name: Meta 1 Part 2
+      points: 250
+      regexp: flag{m1p2}
+      meta: 1
+    - name: Meta 1 Part 3
+      points: 250
+      regexp: flag{m1p3}
+      meta: 1
+    - name: Meta 1 Part 4
+      points: 250
+      regexp: flag{m1p4}
+      meta: 1
+    - name: Meta 2 Part 1
+      points: 100
+      regexp: flag{m2p1}
+      meta: 2
+    - name: Meta 2 Part 1
+      points: 100
+      regexp: flag{m2p1}
+      meta: 2
+
