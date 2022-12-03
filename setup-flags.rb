@@ -71,38 +71,53 @@ def walk(root)
         name = mf['name']
         desc = mf['desc']
         points = mf['points']
+
+        if points.nil?
+          puts "SKIPPING METAFLAG WITH MISSING MANDATORY FIELDS"
+          next
+        end
+        
+
         f = @conn.exec_params(<<-END_SQL, [name, desc, points])
           INSERT INTO metaflags
             (name, description, points)
           VALUES
             ($1, $2, $3)
-          RETURNING id
+          RETURNING id, description
         END_SQL
-        mf_tags[mf['tag']] = f.first['id']
+        mf_tags[mf['tag']] = [f.first['id'], f.first['description']]
       end
 
       yml['flags'].each do |f|
         name = f['name']
-        desc = f['desc']
+        desc = f['desc'].nil? ? '' : f['desc']
         points = f['points']
-        regexp = f['regexp']
+        regexp = normalize(f['regexp'])
         meta_tag = f['meta']
-        bonus = f['bonus'] ? true : false
-        visible = f['hidden'] ? false : meta_tag ? false : true
+        bonus = f['bonus'] ? f['bonus'] : false
+        visible = f['hidden'] ? !f['hidden'] : meta_tag ? false : !bonus
+
+        meta_id = nil
+        if meta_tag
+          meta_id = mf_tags[meta_tag][0]
+          desc = mf_tags[meta_tag][1]
+        end
 
         if name.nil? or points.nil? or regexp.nil?
           puts "SKIPPING FLAG WITH MISSING MANDATORY FIELDS!"
           next
         end
 
-        f = @conn.exec_params(<<-END_SQL, [name, desc, points, regexp, visible, mf_tags[meta_tag]])
+        f = @conn.exec_params(<<-END_SQL, [name, desc, points, regexp, visible, meta_id, bonus])
           INSERT INTO flags
-            (name, description, points, regexp, visible, parent)
+            (name, description, points, regexp, visible, parent, bonus)
           VALUES
-            ($1, $2, $3, $4, $5, $6)
+            ($1, $2, $3, $4, $5, $6, $7)
           RETURNING id
         END_SQL
       end
+
+      @conn.exec("REFRESH MATERIALIZED VIEW v_solves")
 
       if Dir.children('.').include?"attachments" and @bucket != '-'
         puts "Uploading attachments"

@@ -9,7 +9,7 @@ metaflags:
         be pretty straightforward
       tag: 1
     - name: Test Metaflag 2
-      point: 200
+      points: 200
       desc: Short description
       tag: 2
 flags:
@@ -41,8 +41,8 @@ flags:
       points: 100
       regexp: flag{m2p1}
       meta: 2
-    - name: Meta 2 Part 1
+    - name: Meta 2 Part 2
       points: 100
-      regexp: flag{m2p1}
+      regexp: flag{m2p2}
       meta: 2
 

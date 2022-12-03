@@ -160,7 +160,7 @@ END_SQL";
                     row["id"].as!PGinteger,
                     row["meta"].as!PGboolean);
             writefln(fmt,
-                    i + 1,
+                    i,
                     row["name"].as!PGtext,
                     row["meta"].as!PGboolean ? T_RED : T_GREEN,
                     row["points"].as!PGinteger.to!string,
@@ -194,10 +194,10 @@ END_SQL";
         foreach(row; rangify(r)) {
             i++;
             last_print ~= FlagIndex(
-                    row["id"].as!PGinteger,
-                    row["meta"].as!PGboolean);
+                    row["flag_id"].as!PGinteger,
+                    false);
             writefln(fmt,
-                    i + 1,
+                    i,
                     row["flag_name"].as!PGtext,
                     row["time"].as!PGtext,
                     row["points"].as!PGinteger.to!string
